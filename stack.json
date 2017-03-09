@@ -1,0 +1,28 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Mentor App Resources",
+    "Parameters": { 
+      "AMI": { 
+        "Type": "AWS::EC2::Image::Id",
+        "Description": "The AMI to use for testing ( should be ubuntu )"
+      },
+      "KeyName": { 
+        "Type": "AWS::EC2::KeyPair::KeyName",
+        "Description": "The AMI to use for testing ( should be ubuntu )"
+      }
+    },
+    "Resources": {
+      "Instance": {
+        "Type": "AWS::EC2::Instance",
+        "Properties": {
+            "ImageId": { "Ref": "AMI" },
+            "KeyName": { "Ref": "KeyName" },
+            "InstanceType": "t2.micro",
+          "UserData": { "Fn::Base64": { "Fn::Join": [ "\n", [ 
+            "#!/bin/bash",
+            "apt-get update"
+          ] ] } } 
+        }
+      }
+    }
+}
