@@ -1,28 +1,81 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
     "Description": "Mentor App Resources",
-    "Parameters": { 
-      "AMI": { 
-        "Type": "AWS::EC2::Image::Id",
-        "Description": "The AMI to use for testing ( should be ubuntu )"
-      },
-      "KeyName": { 
-        "Type": "AWS::EC2::KeyPair::KeyName",
-        "Description": "The AMI to use for testing ( should be ubuntu )"
-      }
+    "Parameters": {
+        "AMI": {
+            "Description": "The AMI to use for testing ( should be ubuntu )",
+            "Type": "AWS::EC2::Image::Id"
+        },
+        "KeyName": {
+          "Type": "AWS::EC2::KeyPair::KeyName",
+          "Description": "The AMI to use for testing ( should be ubuntu )",
+          "Default": ""
+        }
+    },
+    "Conditions": { 
+      "SSHKey": { "Fn::Not": [ { "Fn::Equals": [ { "Ref": "KeyName" }, "" ] }  ] }
     },
     "Resources": {
-      "Instance": {
-        "Type": "AWS::EC2::Instance",
-        "Properties": {
-            "ImageId": { "Ref": "AMI" },
-            "KeyName": { "Ref": "KeyName" },
-            "InstanceType": "t2.micro",
-          "UserData": { "Fn::Base64": { "Fn::Join": [ "\n", [ 
-            "#!/bin/bash",
-            "apt-get update"
-          ] ] } } 
+        "SG":{
+				  "Type" : "AWS::EC2::SecurityGroup",
+				  "Properties" : {
+				     "GroupDescription" : "Allow external connectivity",
+				     "SecurityGroupIngress" : [ 
+								{
+									"CidrIp": "0.0.0.0/0",
+                  "IpProtocol": "tcp",
+									"FromPort": "80",
+									"ToPort": "80"
+								},
+                { "Fn::If": [ "SSHKey", 
+                    {
+									    "CidrIp": "0.0.0.0/0",
+                      "IpProtocol": "tcp",
+									    "FromPort": "22",
+									    "ToPort": "22"
+                     },
+                     { "Ref": "AWS::NoValue" }
+                ] }
+							]
+				  }
+				} ,
+        "Instance": {
+            "Properties": {
+                "ImageId": {
+                    "Ref": "AMI"
+                },
+                "KeyName": { "Fn::If": [ "SSHKey", { "Ref": "KeyName"}, { "Ref": "AWS::NoValue" } ] },
+                "SecurityGroupIds": [ { "Ref": "SG" } ],
+                "InstanceType": "t2.micro",
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                "#!/bin/bash",
+                                "apt-get update",
+                                "sudo apt-get install -y linux-image-extra-$(uname -r) linux-image-extra-virtual",
+                                "sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common",
+                                "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -",
+                                "sudo add-apt-repository \"deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable\"",
+                                "sudo apt-get update",
+                                "sudo apt-get install -y docker-ce",
+                                "sudo docker run --restart=always -d -p 80:80 nginx"
+                            ]
+                        ]
+                    }
+                }
+            },
+            "Type": "AWS::EC2::Instance"
+        },
+        "PublicIP": {
+            "Properties": {
+                "Domain": "vpc",
+                "InstanceId": {
+                    "Ref": "Instance"
+                }
+            },
+            "Type": "AWS::EC2::EIP"
         }
-      }
     }
 }
